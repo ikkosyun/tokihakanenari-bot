@@ -1,0 +1,50 @@
+name: Daily Post
+
+on:
+  schedule:
+    # UTC 15:00 = JST 0:00 (毎日日本時間0時に実行)
+    - cron: "0 15 * * *"
+  workflow_dispatch: {}  # 手動テスト実行用（Actionsタブから「Run workflow」）
+
+permissions:
+  contents: write
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Japanese font
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate today's image
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
+        run: python main.py --generate
+
+      - name: Commit and push generated image
+        run: |
+          git config user.name "tokihakanenari-bot"
+          git config user.email "actions@github.com"
+          git add docs/images
+          git commit -m "Add daily image $(date -u +%F)" || echo "no changes to commit"
+          git push
+
+      - name: Wait for GitHub Pages to redeploy
+        run: sleep 60
+
+      - name: Publish to Instagram
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          GH_PAGES_BASE_URL: ${{ vars.GH_PAGES_BASE_URL }}
+        run: python main.py --publish
