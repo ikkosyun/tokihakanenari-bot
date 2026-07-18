@@ -16,7 +16,7 @@ import requests
 
 from season import SeasonTheme
 
-DEFAULT_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+DEFAULT_MODEL = os.environ.get("GEMINI_IMAGE_MODEL") or "gemini-2.5-flash-image"
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
