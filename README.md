@@ -37,21 +37,34 @@ GitHub Actions（毎日JST 0:00に自動実行・無料）
 1. Instagramアプリ → プロフィール編集 → 「プロアカウントに切り替える」
 2. カテゴリを選び、ビジネス（またはクリエイター）を選択
    - ※個人情報の公開設定などは自分の判断で選んでください
+   - Facebookページとの連携は、この後の認証方式では**不要**（Instagram単体でOK）
 
-### 4. Facebookページを作成し、Instagramアカウントとリンク
-1. https://www.facebook.com/pages/create でページを新規作成（無料。フォロワーがいなくてもOK、API連携用の器として使う）
-2. Instagramアプリの「プロアカウント設定」→「Facebookとの連携」から、作成したページとリンク
+### 4. Meta for Developersでアプリを作成し、Instagram側のAPI設定を行う
 
-### 5. Meta for Developersでアプリを作成
+実際に動作確認できた手順（2026年7月時点、Meta側の仕様変更で今後も変わりうる）:
+
 1. https://developers.facebook.com/apps でアプリを新規作成（タイプ: 「ビジネス」）
-2. 作成したアプリに「Instagram Graph API」の製品を追加
-3. 「Graph APIエクスプローラー」またはAPIセットアップ画面から、以下を取得:
-   - `IG_USER_ID`（あなたのInstagramビジネスアカウントの数値ID）
-   - アクセストークン（`instagram_basic`, `instagram_content_publish` 権限を含むもの）
-4. 取得した短期トークンは、Meta公式ドキュメントの手順に沿って **長期トークン（60日間有効）** に交換しておく
-5. アプリが「開発モード」の場合、あなた自身のアカウントが「テスター」として使えるようになっているか確認する（Instagramアプリの「アプリとウェブサイト」からテスター招待を承認）。もし投稿時に権限エラーが出る場合は、Meta側の「App Review」申請（無料）が必要になることがある
+2. ダッシュボードで「Instagramでメッセージとコンテンツを管理」のようなユースケースを追加・カスタマイズ
+3. 左メニュー「Instagram」→「API setup with Instagram login」を開き、そこに表示される
+   **Instagram app ID** と **Instagram app secret**（※メインのアプリID/Secretとは別物）を控える
+4. 同じページの「Instagramビジネスログインを設定する」→「ビジネスログイン設定」で、
+   「OAuthリダイレクトURI」に `https://あなたのユーザー名.github.io/tokihakanenari-bot/` を追加
+5. 左メニュー「アプリの役割」→「役割」→ 人を追加 → 役割「**Instagramテスター**」を選び、
+   投稿に使うInstagramのユーザーネームでは検索できないことがあるので、その場合は
+   自分の**Facebookプロフィール名**で検索して選ぶ
+6. Instagram側（アプリまたは https://www.instagram.com/accounts/manage_access/ ）を開き、
+   「アプリとウェブサイト」→「テスターへのご招待」タブで招待を承認する
+7. 以下のURLをブラウザで開いてログイン・許可する（`{Instagram app ID}` と `{redirect_uri}` は自分の値に置き換え）:
+   ```
+   https://www.instagram.com/oauth/authorize?client_id={Instagram app ID}&redirect_uri={redirect_uri}&response_type=code&scope=instagram_business_basic,instagram_business_content_publish
+   ```
+8. 許可後、リダイレクト先URLの `?code=...#_` の部分（`#_`は除く）が認可コード。これを使って
+   `https://api.instagram.com/oauth/access_token` に `client_id`/`client_secret`/`grant_type=authorization_code`/`redirect_uri`/`code` をPOSTすると、
+   **短期アクセストークンとIG_USER_ID**が返る（認可コードは数分で失効するので手早く）
+9. 短期トークンを `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=...&access_token=...` にGETして
+   **長期アクセストークン（60日間有効）**に交換する
 
-> ⚠️ Meta側のAPI仕様・画面は変更されることがあります。手順通りに進まない箇所があれば、そのままエラーメッセージを教えてください。一緒に対処します。
+> ⚠️ Meta側のAPI仕様・画面は変更されることがあります。手順通りに進まない箇所があれば、そのままエラーメッセージを教えてください。一緒に対処します（実際、上の手順にたどり着くまでにも何度か仕様変更に当たりました）。
 
 ### 6. GitHubリポジトリにシークレットを登録
 `Settings` → `Secrets and variables` → `Actions` で以下を登録:
@@ -98,3 +111,15 @@ Windowsでは日本語フォント（游ゴシック/メイリオ）が自動的
 - キャプション文言を変えたい → `caption.py` の `build_caption`
 - 棒グラフのデザイン（ブロック数・位置・サイズ）を変えたい → `chart.py`
 - Geminiのイラストの雰囲気を変えたい → `image_gen.py` の `build_prompt`
+
+## メンテナンス: アクセストークンの更新（60日ごと）
+
+Instagramの長期アクセストークンは**60日で失効**する。切れる前（目安: 50日目くらい）に、
+以下を実行して新しいトークンを取得し、GitHub Secretsの `IG_ACCESS_TOKEN` を更新する:
+
+```bash
+python refresh_token.py
+```
+
+期限切れに気づかず失効してしまった場合は、上の「4. Meta for Developers...」の
+7〜9番をもう一度やり直す必要がある（トークン取得のやり直し）。
