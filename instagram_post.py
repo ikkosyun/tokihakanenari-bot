@@ -1,15 +1,19 @@
-"""Instagram Graph APIへの投稿（2ステップ: コンテナ作成 → 公開）。
+"""Instagram API (Instagram Login) への投稿（2ステップ: コンテナ作成 → 公開）。
 
 事前にInstagramアカウントがビジネス/クリエイターアカウント化され、
-Facebookページと連携し、instagram_basic / instagram_content_publish
-権限を持つアクセストークンを取得していることが前提（README参照）。
+「Business Login for Instagram」経由で instagram_business_basic /
+instagram_business_content_publish 権限を持つアクセストークンを
+取得していることが前提（README参照）。
+
+トークンは graph.facebook.com ではなく graph.instagram.com 宛てに
+使う必要がある（Instagramネイティブのログインフローで発行されたトークンのため）。
 """
 import os
 import time
 
 import requests
 
-GRAPH_HOST = "https://graph.facebook.com"
+GRAPH_HOST = "https://graph.instagram.com"
 
 
 def post_image(image_url: str, caption: str) -> str:
