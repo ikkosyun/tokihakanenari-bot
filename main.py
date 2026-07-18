@@ -40,16 +40,18 @@ def _generate(target_date: date, out_dir: Path) -> tuple[Path, str, str]:
     """画像・キャプションを生成し、(画像パス, ファイル名の日付文字列, キャプション) を返す。"""
     import image_gen
     import chart
+    import story
 
     stats = compute_day_stats(target_date)
     theme = theme_for_month(target_date.month)
-    caption = build_caption(stats, theme)
+    time_story = story.generate_time_story(theme)
+    caption = build_caption(stats, theme, time_story)
 
     date_str = target_date.strftime("%Y-%m-%d")
     tmp_hourglass = out_dir / f".hourglass-{date_str}.png"
     final_image = out_dir / f"{date_str}.jpg"
 
-    image_gen.generate_hourglass_image(theme, tmp_hourglass)
+    image_gen.generate_hourglass_image(theme, stats, tmp_hourglass)
     chart.compose_image(tmp_hourglass, stats, theme, final_image)
     tmp_hourglass.unlink(missing_ok=True)
 

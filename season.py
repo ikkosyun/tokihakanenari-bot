@@ -1,7 +1,7 @@
 """月ごとの季節配色テーマ定義。
 
-Gemini への画像生成プロンプトと、Pillow で描く棒グラフ・テキストの色に
-共通で使う「季節のパレット」を1箇所にまとめている。
+Gemini への画像生成プロンプト（背景の情景描写）と、Pillow で描く
+バー・文字の強調色に共通で使う「季節のテーマ」を1箇所にまとめている。
 """
 from dataclasses import dataclass
 
@@ -9,39 +9,56 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class SeasonTheme:
     month: int
-    label: str  # 季節の呼び名（キャプションにも使う）
-    prompt_palette: str  # Geminiへのプロンプトに埋め込む配色描写（日本語）
-    bg_top: str  # 背景グラデーション上端（hex）
-    bg_bottom: str  # 背景グラデーション下端（hex）
-    accent: str  # 棒グラフ・強調色（hex）
+    label: str  # 季節の呼び名（キャプション・小話のテーマにも使う）
+    prompt_palette: str  # Geminiへの背景描写プロンプト（具体的な情景で指定する）
+    accent: str  # バー・強調テキストの色（hex）
     text_color: str  # 本文テキスト色（hex、背景とのコントラストを確保）
 
 
 THEMES: dict[int, SeasonTheme] = {
-    1: SeasonTheme(1, "正月・新春", "松の深緑と金箔のような輝き、凛とした冬の空気",
-                   "#0b2e1f", "#123524", "#d4af37", "#f5f0e1"),
-    2: SeasonTheme(2, "梅の候", "紅梅の濃いピンクと雪の白、澄んだ寒空の青",
-                   "#241222", "#3a1a35", "#e8608f", "#f7e9f0"),
-    3: SeasonTheme(3, "早春", "桜のつぼみの淡いピンクと若草色、やわらかな春の光",
-                   "#2b1f2a", "#3d2b3a", "#f2a6c1", "#fbeef3"),
-    4: SeasonTheme(4, "桜満開", "満開の桜のピンクと新緑の黄緑、明るい春の日差し",
-                   "#2a1830", "#3f2440", "#ff8fb1", "#fff2f6"),
-    5: SeasonTheme(5, "新緑", "みずみずしい新緑の黄緑と澄んだ五月晴れの青",
-                   "#0f2a1c", "#163a26", "#7fd858", "#eefcf1"),
-    6: SeasonTheme(6, "紫陽花・梅雨", "紫陽花の青紫とグレーがかった雨の空気感",
-                   "#1c1f3a", "#262a4d", "#8a7fe0", "#f0eefc"),
-    7: SeasonTheme(7, "七夕・盛夏", "夜空の深いブルーと天の川の金色の輝き",
-                   "#071233", "#0c1f4d", "#f4c542", "#fff8e6"),
-    8: SeasonTheme(8, "真夏", "抜けるような真夏の青空とまぶしい白、入道雲",
-                   "#04275c", "#0a3a80", "#ffffff", "#eaf4ff"),
-    9: SeasonTheme(9, "実りの秋", "稲穂やかぼちゃを思わせる琥珀色とオレンジ",
-                   "#3a2408", "#4f3010", "#e8912a", "#fff3e0"),
-    10: SeasonTheme(10, "紅葉", "燃えるような紅葉の赤とオレンジのグラデーション",
-                    "#3a0f0a", "#521810", "#e8542a", "#fff0ea"),
-    11: SeasonTheme(11, "晩秋", "深紅と焦げ茶色、落ち葉が舞う静かな夕暮れ",
-                    "#2a0e0e", "#3d1616", "#b5432a", "#f7e9e2"),
-    12: SeasonTheme(12, "冬・年の瀬", "白銀の雪とゴールドの輝き、澄み切った夜空",
-                    "#0a1428", "#141f3d", "#e8d9a0", "#f5f7ff"),
+    1: SeasonTheme(1, "正月・新春",
+                   "a crisp New Year's morning: pine trees dusted with snow, a "
+                   "brilliant golden sunrise, clear pale blue winter sky",
+                   "#d4af37", "#f5f0e1"),
+    2: SeasonTheme(2, "梅の候",
+                   "deep pink plum blossoms in a quiet garden, soft winter "
+                   "sunlight, a clear pale blue sky",
+                   "#e8608f", "#f7e9f0"),
+    3: SeasonTheme(3, "早春",
+                   "cherry blossom buds just about to bloom, a gentle spring "
+                   "breeze, soft pastel pink and pale blue sky",
+                   "#f2a6c1", "#fbeef3"),
+    4: SeasonTheme(4, "桜満開",
+                   "a full bloom cherry blossom avenue with petals drifting in "
+                   "the wind, bright spring sunlight, vivid blue sky",
+                   "#ff8fb1", "#fff2f6"),
+    5: SeasonTheme(5, "新緑", "fresh vivid green new leaves, a clear early-summer "
+                   "blue sky, bright and refreshing sunlight",
+                   "#7fd858", "#eefcf1"),
+    6: SeasonTheme(6, "紫陽花・梅雨",
+                   "blue and purple hydrangea flowers in a garden after rain, "
+                   "soft misty overcast light, gentle rain droplets",
+                   "#8a7fe0", "#f0eefc"),
+    7: SeasonTheme(7, "真夏の海", "a vivid, dazzling summer sky and calm blue ocean, "
+                   "brilliant white clouds, clear turquoise water, bright "
+                   "sunlight reflecting on the sea",
+                   "#1fb6e8", "#eaf9ff"),
+    8: SeasonTheme(8, "真夏", "a blazing deep blue summer sky with towering white "
+                   "cumulonimbus clouds, intense bright sunlight",
+                   "#0a8fd4", "#eaf4ff"),
+    9: SeasonTheme(9, "実りの秋", "golden ripe rice fields swaying in the autumn "
+                   "breeze, a clear high autumn sky, warm amber light",
+                   "#e8912a", "#fff3e0"),
+    10: SeasonTheme(10, "紅葉", "a mountainside blazing with red and orange autumn "
+                    "leaves (momiji), crisp clear air, soft autumn sunlight",
+                    "#e8542a", "#fff0ea"),
+    11: SeasonTheme(11, "晩秋", "a quiet tree-lined path scattered with fallen "
+                    "russet and brown leaves, a soft late-autumn evening glow",
+                    "#b5432a", "#f7e9e2"),
+    12: SeasonTheme(12, "冬・年の瀬",
+                    "a serene snow-covered landscape under a clear, crisp cold "
+                    "night sky filled with stars, soft silver-blue moonlight",
+                    "#8fb8e8", "#f5f7ff"),
 }
 
 
