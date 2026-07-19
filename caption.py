@@ -41,10 +41,15 @@ def _is_leap(year: int) -> bool:
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
+def build_header(stats: DayStats) -> str:
+    date_line = f"{stats.year}年{stats.month}月{stats.day}日になりました。"
+    remain_line = f"今年は残り{stats.remaining_days}日です。あと{stats.remaining_percent:.1f}%です。"
+    return f"{date_line}\n{remain_line}"
+
+
 def build_caption(stats: DayStats, theme: SeasonTheme, story: str) -> str:
     return (
-        f"{stats.year}年{stats.month}月{stats.day}日になりました。\n"
-        f"今年は残り{stats.remaining_days}日です。あと{stats.remaining_percent:.1f}%です。\n"
+        f"{build_header(stats)}\n"
         f"\n"
         f"{story}\n"
         f"\n"

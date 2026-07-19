@@ -16,7 +16,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from caption import build_caption, compute_day_stats
+from caption import build_caption, build_header, compute_day_stats
 from season import theme_for_month
 
 JST = timezone(timedelta(hours=9))
@@ -30,6 +30,9 @@ except ImportError:
 ROOT = Path(__file__).parent
 DOCS_IMAGES = ROOT / "docs" / "images"
 PREVIEW_DIR = ROOT / "preview"
+
+# 日付表示＋残り%表示＋本文を合わせて、この文字数以内に収める(旧Twitterの140字を踏襲)。
+CAPTION_TOTAL_LIMIT = 140
 
 
 def _parse_date(value: str | None) -> date:
@@ -49,7 +52,10 @@ def _generate(target_date: date, out_dir: Path) -> tuple[Path, str, str]:
 
     stats = compute_day_stats(target_date)
     theme = theme_for_month(target_date.month)
-    time_story = story.generate_time_story(theme)
+
+    header_len = len(build_header(stats))
+    story_budget = CAPTION_TOTAL_LIMIT - header_len - 1  # ヘッダーと本文の間の改行ぶん
+    time_story = story.generate_time_story(theme, max_length=story_budget)
     caption = build_caption(stats, theme, time_story)
 
     date_str = target_date.strftime("%Y-%m-%d")
