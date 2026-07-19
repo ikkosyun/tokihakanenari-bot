@@ -42,9 +42,10 @@ jobs:
       - name: Wait for GitHub Pages to redeploy
         run: sleep 60
 
-      - name: Publish to Instagram
+      - name: Publish to Instagram and Slack
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           GH_PAGES_BASE_URL: ${{ vars.GH_PAGES_BASE_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: python main.py --publish

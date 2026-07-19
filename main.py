@@ -83,6 +83,7 @@ def cmd_generate(target_date: date) -> None:
 
 def cmd_publish() -> None:
     import instagram_post
+    import slack_post
 
     base_url = os.environ["GH_PAGES_BASE_URL"].rstrip("/")
     date_str = (DOCS_IMAGES / "latest.txt").read_text(encoding="utf-8").strip()
@@ -94,6 +95,9 @@ def cmd_publish() -> None:
 
     story_id = instagram_post.post_story(image_url)
     print(f"[publish] ストーリーにも投稿しました。story_id={story_id}")
+
+    if slack_post.post_image_notification(image_url, caption):
+        print("[publish] Slackにも通知を送りました。")
 
 
 def main() -> None:
