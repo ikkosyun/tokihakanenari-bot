@@ -36,7 +36,7 @@ jobs:
           git config user.name "tokihakanenari-bot"
           git config user.email "actions@github.com"
           git add docs/images
-          git commit -m "Add daily image $(date -u +%F)" || echo "no changes to commit"
+          git commit -m "Add daily image $(cat docs/images/latest.txt)" || echo "no changes to commit"
           git push
 
       - name: Wait for GitHub Pages to redeploy

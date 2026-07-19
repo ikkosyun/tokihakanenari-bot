@@ -59,7 +59,18 @@ python refresh_token.py
 
 出力された新しいトークンを、GitHub Secretsの `IG_ACCESS_TOKEN` に上書き登録する。
 **忘れて失効すると、5章のOAuth手順を最初からやり直しになる**ので要注意。
-起点: 初回トークン取得日は2026-07-18。次回は2026-09上旬までに更新推奨。
+起点: 2026-07-19に再認証済み。次回は2026-09中旬までに更新推奨。
+
+**2026-07-19に発生した実例:** 60日の期限切れではなく、`refresh_token.py`が
+`400 Bad Request`で失敗するパターンに遭遇した。Instagram APIのエラーは
+`Error validating access token: The session has been invalidated because the
+user changed their password or Facebook has changed the session for security
+reasons.`(code 190) — Meta側のセキュリティ判定によるセッション無効化で、
+ユーザー本人はパスワード変更等の心当たりがなかった（原因不明、Meta側の
+自動判定と思われる）。この場合`refresh_token.py`では復旧できず、5章の
+OAuth認可フロー（`instagram.com/oauth/authorize`から）を最初からやり直す
+必要がある。認可コードは`?code=...`としてリダイレクト先URLに付与される
+（`redirect_uri`のページ自体は404で構わない、URLのcodeさえ取れればいい）。
 
 ## 5. 既知のハマりどころ
 
