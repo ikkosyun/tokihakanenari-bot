@@ -13,11 +13,13 @@
 """
 import argparse
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from caption import build_caption, compute_day_stats
 from season import theme_for_month
+
+JST = timezone(timedelta(hours=9))
 
 try:
     from dotenv import load_dotenv
@@ -32,7 +34,10 @@ PREVIEW_DIR = ROOT / "preview"
 
 def _parse_date(value: str | None) -> date:
     if value is None:
-        return date.today()
+        # GitHub Actionsランナーはシステム時刻がUTCのため、date.today()だと
+        # JST 0:00〜8:59台に実行された場合に前日の日付になってしまう。
+        # 「今日」は常にJSTの暦日で判定する。
+        return datetime.now(JST).date()
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
@@ -86,6 +91,9 @@ def cmd_publish() -> None:
 
     media_id = instagram_post.post_image(image_url, caption)
     print(f"[publish] Instagramに投稿しました。media_id={media_id}")
+
+    story_id = instagram_post.post_story(image_url)
+    print(f"[publish] ストーリーにも投稿しました。story_id={story_id}")
 
 
 def main() -> None:
