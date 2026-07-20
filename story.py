@@ -4,12 +4,14 @@
 """
 import os
 import random
+import time
 
 from season import SeasonTheme
 
 import requests
 
 DEFAULT_MODEL = os.environ.get("GEMINI_TEXT_MODEL") or "gemini-flash-latest"
+FALLBACK_MODEL = os.environ.get("GEMINI_TEXT_FALLBACK_MODEL") or "gemini-flash-lite-latest"
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_MAX_LENGTH = 100
 
@@ -48,18 +50,40 @@ def build_prompt(theme: SeasonTheme, max_length: int) -> str:
     )
 
 
+def _call_gemini(model: str, prompt: str, api_key: str, retry_delays: list[int]):
+    """503(混雑中)なら指定回数リトライする。それ以外のエラー、またはリトライを
+    使い切ってもダメだった場合はNoneを返す(例外は投げない)。"""
+    url = f"{API_BASE}/{model}:generateContent"
+    body = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    last_res = None
+    for attempt, delay in enumerate([0, *retry_delays]):
+        if delay:
+            time.sleep(delay)
+        res = requests.post(url, params={"key": api_key}, json=body, timeout=60)
+        if res.ok:
+            return res
+        last_res = res
+        if res.status_code != 503:
+            break
+    return None if last_res is None or not last_res.ok else last_res
+
+
 def generate_time_story(theme: SeasonTheme, max_length: int = DEFAULT_MAX_LENGTH,
                          model: str = DEFAULT_MODEL) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("環境変数 GEMINI_API_KEY が設定されていません")
 
-    url = f"{API_BASE}/{model}:generateContent"
-    body = {"contents": [{"parts": [{"text": build_prompt(theme, max_length)}]}]}
+    prompt = build_prompt(theme, max_length)
 
-    res = requests.post(url, params={"key": api_key}, json=body, timeout=60)
-    if not res.ok:
-        raise RuntimeError(f"Gemini API error ({res.status_code}): {res.text}")
+    # Geminiの一時的な混雑(503)は数十秒待てば直ることが多いため、まず本命モデルで
+    # リトライする。それでもダメなら、別モデル(lite版)へ1回だけフォールバックする。
+    res = _call_gemini(model, prompt, api_key, retry_delays=[10, 30])
+    if res is None and model != FALLBACK_MODEL:
+        res = _call_gemini(FALLBACK_MODEL, prompt, api_key, retry_delays=[])
+    if res is None:
+        raise RuntimeError(f"Gemini API error: {model}/{FALLBACK_MODEL} ともに失敗しました")
 
     data = res.json()
     text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
