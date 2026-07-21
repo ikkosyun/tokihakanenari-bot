@@ -270,8 +270,13 @@ def compose_reel_frame(square_image_path: Path, narration_text: str, theme: Seas
     W, H = STORY_SIZE
     square = Image.open(square_image_path).convert("RGB").resize((W, W), Image.LANCZOS)
 
+    # リールUI自体がプロフィールアイコンを左上に重ねて表示するため、画像をそのまま
+    # 最上部(y=0)に置くと左上のカレンダータイルと衝突する。約1cm(スマホ標準的な
+    # 326ppi換算で128px)ぶん下にずらして避ける。上に空く帯はキャンバス背景色のまま。
+    IMAGE_TOP_OFFSET = 128
+
     canvas = Image.new("RGB", (W, H), (8, 10, 16))
-    canvas.paste(square, (0, 0))
+    canvas.paste(square, (0, IMAGE_TOP_OFFSET))
     draw = ImageDraw.Draw(canvas)
 
     date_part, _, rest = narration_text.partition("。")
@@ -282,8 +287,8 @@ def compose_reel_frame(square_image_path: Path, narration_text: str, theme: Seas
         (percent_part, _hex_to_rgb(theme.accent)),
     ]
 
-    band_top = W
-    band_h = H - W
+    band_top = IMAGE_TOP_OFFSET + W
+    band_h = H - band_top
     side_margin = 56
     max_text_width = W - side_margin * 2
     gap = 22
