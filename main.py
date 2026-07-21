@@ -105,8 +105,13 @@ def cmd_publish() -> None:
     story_id = instagram_post.post_story(story_image_url)
     print(f"[publish] ストーリーにも投稿しました。story_id={story_id}")
 
-    if slack_post.post_image_notification(image_url, caption):
-        print("[publish] Slackにも通知を送りました。")
+    # Slack通知はあくまでおまけ機能。Instagram投稿(本体)が成功していれば、
+    # Slack側の一時的な失敗だけでジョブ全体を失敗扱いにはしない。
+    try:
+        if slack_post.post_image_notification(image_url, caption):
+            print("[publish] Slackにも通知を送りました。")
+    except Exception as e:
+        print(f"[publish] Slack通知に失敗しましたが、Instagram投稿は完了しているため続行します: {e}")
 
 
 def main() -> None:
