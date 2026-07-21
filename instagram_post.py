@@ -57,6 +57,47 @@ def post_story(image_url: str) -> str:
     return _publish_container(base, access_token, creation_id)
 
 
+# 動画(リール)はInstagram側でのエンコード処理に数十秒〜数分かかるため、写真のような
+# 固定sleepではなくstatus_codeをポーリングして完了を待つ。
+_REEL_POLL_INTERVAL_SEC = 10
+_REEL_POLL_TIMEOUT_SEC = 300
+
+
+def _wait_for_container_ready(base: str, access_token: str, creation_id: str) -> None:
+    elapsed = 0
+    while elapsed <= _REEL_POLL_TIMEOUT_SEC:
+        res = requests.get(f"{base}/{creation_id}", params={
+            "fields": "status_code",
+            "access_token": access_token,
+        }, timeout=30)
+        _raise_for_status(res)
+        status = res.json().get("status_code")
+        if status == "FINISHED":
+            return
+        if status == "ERROR":
+            raise RuntimeError(f"Instagram側の動画処理が失敗しました(status_code=ERROR): container={creation_id}")
+        time.sleep(_REEL_POLL_INTERVAL_SEC)
+        elapsed += _REEL_POLL_INTERVAL_SEC
+    raise RuntimeError(f"Instagram側の動画処理が{_REEL_POLL_TIMEOUT_SEC}秒以内に完了しませんでした: container={creation_id}")
+
+
+def post_reel(video_url: str, caption: str | None = None) -> str:
+    """動画をリールとして投稿する（media_type=REELS）。"""
+    access_token = os.environ["IG_ACCESS_TOKEN"]
+    base = _base_url()
+
+    extra = {"media_type": "REELS"}
+    if caption:
+        extra["caption"] = caption
+    data = {"video_url": video_url, "access_token": access_token, **extra}
+    res = requests.post(f"{base}/media", data=data, timeout=60)
+    _raise_for_status(res)
+    creation_id = res.json()["id"]
+
+    _wait_for_container_ready(base, access_token, creation_id)
+    return _publish_container(base, access_token, creation_id)
+
+
 def _raise_for_status(res: requests.Response) -> None:
     if not res.ok:
         raise RuntimeError(f"Instagram API error ({res.status_code}): {res.text}")

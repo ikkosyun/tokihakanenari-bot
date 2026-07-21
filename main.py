@@ -64,6 +64,8 @@ def _generate(target_date: date, out_dir: Path) -> tuple[Path, str, str]:
     import image_gen
     import chart
     import story
+    import narration
+    import reel_video
 
     stats = compute_day_stats(target_date)
     theme = theme_for_month(target_date.month)
@@ -77,11 +79,21 @@ def _generate(target_date: date, out_dir: Path) -> tuple[Path, str, str]:
     tmp_hourglass = out_dir / f".hourglass-{date_str}.png"
     final_image = out_dir / f"{date_str}.jpg"
     story_image = out_dir / f"{date_str}_story.jpg"
+    reel_frame = out_dir / f".reel_frame-{date_str}.jpg"
+    narration_audio = out_dir / f".narration-{date_str}.wav"
+    reel_video_path = out_dir / f"{date_str}_reel.mp4"
 
     image_gen.generate_hourglass_image(theme, stats, tmp_hourglass)
     chart.compose_image(tmp_hourglass, stats, theme, final_image)
     tmp_hourglass.unlink(missing_ok=True)
     chart.compose_story_image(final_image, story_image)
+
+    narration_text = narration.build_narration_text(stats)
+    chart.compose_reel_frame(final_image, narration_text, theme, reel_frame)
+    narration.generate_narration_audio(narration_text, narration_audio)
+    reel_video.compose_reel_video(reel_frame, narration_audio, reel_video_path)
+    reel_frame.unlink(missing_ok=True)
+    narration_audio.unlink(missing_ok=True)
 
     return final_image, date_str, caption
 
@@ -113,12 +125,21 @@ def cmd_publish() -> None:
     caption = (DOCS_IMAGES / f"{date_str}.caption.txt").read_text(encoding="utf-8")
     image_url = f"{base_url}/images/{date_str}.jpg"
     story_image_url = f"{base_url}/images/{date_str}_story.jpg"
+    reel_video_url = f"{base_url}/images/{date_str}_reel.mp4"
 
     media_id = instagram_post.post_image(image_url, caption)
     print(f"[publish] Instagramに投稿しました。media_id={media_id}")
 
     story_id = instagram_post.post_story(story_image_url)
     print(f"[publish] ストーリーにも投稿しました。story_id={story_id}")
+
+    # リールはまだ導入したばかりの機能のため、Slackと同様に失敗してもジョブ全体を
+    # 失敗扱いにはしない（フィード＋ストーリーという本体投稿が成功していれば十分）。
+    try:
+        reel_id = instagram_post.post_reel(reel_video_url, caption)
+        print(f"[publish] リールにも投稿しました。reel_id={reel_id}")
+    except Exception as e:
+        print(f"[publish] リール投稿に失敗しましたが、フィード/ストーリー投稿は完了しているため続行します: {e}")
 
     # Slack通知はあくまでおまけ機能。Instagram投稿(本体)が成功していれば、
     # Slack側の一時的な失敗だけでジョブ全体を失敗扱いにはしない。

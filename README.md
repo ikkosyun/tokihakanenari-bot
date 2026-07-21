@@ -1,7 +1,8 @@
 # tokihakanenari bot
 
 毎日0時に「今年の残り日数」をテキスト＋Gemini生成イラスト＋棒グラフの画像でInstagramに投稿するbot。
-月ごとに配色テーマが変わり、季節感を表現する。すべて無料サービスの組み合わせで動く。
+フィード投稿・ストーリーに加えて、同じ内容をナレーション付きの動画にしたリールも投稿する。
+月ごとに配色テーマが変わり、季節感を表現する。すべて無料サービスの組み合わせ＋わずかなGemini課金で動く。
 
 ## 仕組み（全体像）
 
@@ -9,9 +10,13 @@
 GitHub Actions（毎日JST 0:00に自動実行・無料）
   → Gemini APIで砂時計イラストを生成
   → Pillow（Python画像処理）で棒グラフと日付を正確に描いて合成
-  → GitHub Pages（無料の公開ホスティング）に画像を置く
-  → Instagram Graph APIで、その公開URLを指定して投稿
+  → Gemini TTSでナレーション音声を生成し、ffmpegでリール動画(mp4)を作成
+  → GitHub Pages（無料の公開ホスティング）に画像/動画を置く
+  → Instagram Graph APIで、その公開URLを指定してフィード・ストーリー・リールに投稿
 ```
+
+**リール機能にはffmpegが必要。** GitHub Actions(ubuntu-latest)には標準で入っているため追加設定不要。
+ローカルのWindowsで`--dry-run`を試す場合だけ、`winget install Gyan.FFmpeg`等で別途インストールすること。
 
 **なぜGitHub Pagesが必要か:** Instagramへの自動投稿APIは「どこかに公開されている画像のURL」を渡す方式で、ファイルを直接アップロードする方式ではない。そのため、生成した画像を一時的にでも公開の場所に置く必要があり、無料で使えるGitHub Pagesを使っている。
 
@@ -111,6 +116,9 @@ Windowsでは日本語フォント（游ゴシック/メイリオ）が自動的
 - キャプション文言を変えたい → `caption.py` の `build_caption`
 - 棒グラフのデザイン（ブロック数・位置・サイズ）を変えたい → `chart.py`
 - Geminiのイラストの雰囲気を変えたい → `image_gen.py` の `build_prompt`
+- リールのナレーション文言を変えたい → `narration.py` の `build_narration_text`
+- リールのフレームレイアウト（画像/キャプションの配置）を変えたい → `chart.py` の `compose_reel_frame`
+- ナレーションの声を変えたい → `.env` の `GEMINI_TTS_VOICE`（Gemini TTSのプリセット音声名）
 
 ## メンテナンス: アクセストークンの更新（60日ごと）
 

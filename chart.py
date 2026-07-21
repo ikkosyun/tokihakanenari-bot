@@ -244,6 +244,86 @@ def compose_image(hourglass_path: Path, stats: DayStats, theme: SeasonTheme,
     return out_path
 
 
+def _max_font_size_for_width(draw: ImageDraw.ImageDraw, text: str, max_width: int,
+                              lo: int = 10, hi: int = 260) -> int:
+    """指定した幅に収まる最大のフォントサイズを二分探索で求める。"""
+    best = lo
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        bbox = draw.textbbox((0, 0), text, font=_font(mid))
+        if bbox[2] - bbox[0] <= max_width:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
+def compose_reel_frame(square_image_path: Path, narration_text: str, theme: SeasonTheme,
+                        out_path: Path) -> Path:
+    """リール動画用の1フレーム(9:16)を作る。上部にフィード用の正方形画像をそのまま置き、
+    下部の黒帯にナレーション文をそのまま3行で大きく表示する（音声と同じ文言を字幕的に見せる）。
+
+    3行の分け方は文中の「。」「、」で固定（ナレーション文は日付・残り日数・残り%の
+    3要素で構成される前提のため、汎用的な自動折り返しではなくこの前提に合わせている）。
+    """
+    W, H = STORY_SIZE
+    square = Image.open(square_image_path).convert("RGB").resize((W, W), Image.LANCZOS)
+
+    canvas = Image.new("RGB", (W, H), (8, 10, 16))
+    canvas.paste(square, (0, 0))
+    draw = ImageDraw.Draw(canvas)
+
+    date_part, _, rest = narration_text.partition("。")
+    remain_part, _, percent_part = rest.partition("、")
+    lines = [
+        (date_part + "。", (235, 235, 235)),
+        (remain_part + "、", _hex_to_rgb(theme.accent)),
+        (percent_part, _hex_to_rgb(theme.accent)),
+    ]
+
+    band_top = W
+    band_h = H - W
+    side_margin = 56
+    max_text_width = W - side_margin * 2
+    gap = 22
+    v_padding = 36
+
+    sizes = [_max_font_size_for_width(draw, text, max_text_width) for text, _ in lines]
+    sizes[2] = sizes[1]  # %の行は残り日数の行とサイズを揃える
+
+    def line_heights(sizes):
+        return [draw.textbbox((0, 0), text, font=_font(s))[3]
+                - draw.textbbox((0, 0), text, font=_font(s))[1]
+                for (text, _), s in zip(lines, sizes)]
+
+    heights = line_heights(sizes)
+    total_h = sum(heights) + gap * (len(lines) - 1)
+    available_h = band_h - v_padding * 2
+    if total_h > available_h:
+        scale = available_h / total_h
+        sizes = [max(10, int(s * scale)) for s in sizes]
+        heights = line_heights(sizes)
+        total_h = sum(heights) + gap * (len(lines) - 1)
+
+    # textbboxのtop/leftオフセット(フォントの行送り分の余白)を打ち消してから配置しないと、
+    # 黒帯の中で見た目の中心がずれる。
+    y = band_top + (band_h - total_h) / 2
+    for (text, color), size, h in zip(lines, sizes, heights):
+        f = _font(size)
+        bbox = draw.textbbox((0, 0), text, font=f)
+        w = bbox[2] - bbox[0]
+        x = (W - w) / 2
+        draw_x, draw_y = x - bbox[0], y - bbox[1]
+        draw.text((draw_x + 3, draw_y + 4), text, font=f, fill=(0, 0, 0, 180))
+        draw.text((draw_x, draw_y), text, font=f, fill=color)
+        y += h + gap
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(out_path, "JPEG", quality=92)
+    return out_path
+
+
 def compose_story_image(square_image_path: Path, out_path: Path) -> Path:
     """フィード用の正方形(1080x1080)画像を、Instagramストーリーの9:16枠に
     クロップされず全体が収まるよう変換する。上下の余白は同じ画像を拡大・ぼかした
