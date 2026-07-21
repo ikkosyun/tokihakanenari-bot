@@ -16,7 +16,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from caption import build_caption, build_header, compute_day_stats
+from caption import build_caption, compute_day_stats, extract_story
 from season import theme_for_month
 
 JST = timezone(timedelta(hours=9))
@@ -33,6 +33,21 @@ PREVIEW_DIR = ROOT / "preview"
 
 # 日付表示＋残り%表示＋本文を合わせて、この文字数以内に収める(旧Twitterの140字を踏襲)。
 CAPTION_TOTAL_LIMIT = 140
+
+# 直近何日分の投稿本文を「重複禁止」としてGeminiに渡すか。
+RECENT_HISTORY_DAYS = 7
+
+
+def _recent_stories(out_dir: Path, target_date: date, days: int = RECENT_HISTORY_DAYS) -> list[str]:
+    """直近days日分の、既に保存済みのキャプションから本文だけを集める。
+    ファイルが無い日(履歴が浅い/dry-run用ディレクトリ等)は単に読み飛ばす。"""
+    recent = []
+    for i in range(1, days + 1):
+        d = target_date - timedelta(days=i)
+        caption_path = out_dir / f"{d.strftime('%Y-%m-%d')}.caption.txt"
+        if caption_path.exists():
+            recent.append(extract_story(caption_path.read_text(encoding="utf-8")))
+    return recent
 
 
 def _parse_date(value: str | None) -> date:
@@ -53,10 +68,10 @@ def _generate(target_date: date, out_dir: Path) -> tuple[Path, str, str]:
     stats = compute_day_stats(target_date)
     theme = theme_for_month(target_date.month)
 
-    header_len = len(build_header(stats))
-    story_budget = CAPTION_TOTAL_LIMIT - header_len - 1  # ヘッダーと本文の間の改行ぶん
-    time_story = story.generate_time_story(theme, max_length=story_budget)
-    caption = build_caption(stats, theme, time_story)
+    # 日付＋残り%のヘッダーは文字数制限に含めず、本文だけをCAPTION_TOTAL_LIMIT以内にする。
+    recent = _recent_stories(out_dir, target_date)
+    daily_story = story.generate_daily_story(theme, max_length=CAPTION_TOTAL_LIMIT, avoid=recent)
+    caption = build_caption(stats, theme, daily_story)
 
     date_str = target_date.strftime("%Y-%m-%d")
     tmp_hourglass = out_dir / f".hourglass-{date_str}.png"

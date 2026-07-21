@@ -55,3 +55,10 @@ def build_caption(stats: DayStats, theme: SeasonTheme, story: str) -> str:
         f"\n"
         f"#今年の残り日数 #時間の大切さ #{theme.label.replace('・', '')}"
     )
+
+
+def extract_story(caption_text: str) -> str:
+    """build_captionが作った本文から、本文(story)部分だけを取り出す。
+    ヘッダー/本文/ハッシュタグの3ブロックが空行で区切られている前提。"""
+    parts = caption_text.strip("\n").split("\n\n")
+    return parts[1] if len(parts) >= 2 else ""

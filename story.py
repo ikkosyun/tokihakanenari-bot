@@ -1,4 +1,8 @@
-"""毎日の投稿本文に載せる「時間にまつわる小話」をGeminiのテキスト生成で作る。
+"""毎日の投稿本文に載せる一言をGeminiのテキスト生成で作る。
+
+以前は「時間の大切さ」を毎日訴える内容にしていたが、単調で説教くさく、
+いかにもAIが書いた文章に見えやすかったため撤廃。代わりに、今日という日が
+少しでも前向きになるようなジャンルを日替わりでランダムに選ぶ。
 
 画像生成モデルと違い、テキスト専用モデルは無料枠が使えるため追加コストはかからない。
 """
@@ -15,39 +19,100 @@ FALLBACK_MODEL = os.environ.get("GEMINI_TEXT_FALLBACK_MODEL") or "gemini-flash-l
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_MAX_LENGTH = 100
 
-# 「季節の自然描写→教訓」という同じ型に毎回落ち着かないよう、切り口を日替わりでランダムに指定する。
-# いずれも「海・波・光」のような抽象的な自然詩ではなく、日常生活の中の一コマが軸。
-_ANGLES = [
-    "家事の合間（洗濯物をたたむ、お湯を沸かす、皿を洗うなど）にふと訪れる短い時間を描写する",
-    "通勤・通学中や、駅・信号待ちなど、移動の途中にある小さな時間の隙間を描写する",
-    "一日の中の切り替わりの瞬間（起きた直後、仕事帰り、寝る前など）を描写する",
-    "読者に直接語りかける短い問いかけを使う（例: 「〜したのはいつだった？」のような、答えを迫らない軽い問い）",
-    "何かを『待っている』時間（お湯が沸く、電車が来る、返信が来るなど）に目を向ける",
+# 日替わりでランダムに1つ選ぶジャンル。「時間」縛りをやめ、読んだ人の一日が
+# 少しでも前向きになる方向で、毎回違う切り口になるようにしている。
+_CATEGORIES = [
+    {
+        "name": "偉人の言葉",
+        "instruction": (
+            "実在する偉人・著名人(思想家、科学者、経営者、アスリート、作家、"
+            "芸術家など分野は問わない)の、実際に知られている名言を1つ紹介し、"
+            "誰の言葉かを明記した上で、それに一言だけ短い感想や今日への活かし方を"
+            "添える。うろ覚えの引用や創作した名言を本物として紹介しない。"
+            "名言部分は必ず「」で正しく囲む(開始の「を絶対に忘れない)。"
+        ),
+    },
+    {
+        "name": "季節感",
+        "instruction": (
+            "今の季節や気候・行事・旬の食べ物・風物詩など、季節感のある"
+            "具体的な話題を1つ取り上げ、そこから生まれる小さな気づきや"
+            "味わいを描く。"
+        ),
+    },
+    {
+        "name": "今日を頑張れる一言",
+        "instruction": (
+            "今日1日を少し前向きに過ごせるような、シンプルで力強い応援の"
+            "一言を書く。抽象的な精神論だけで終わらせず、具体的にイメージ"
+            "できる情景や行動を1つ添える。"
+        ),
+    },
+    {
+        "name": "くすっと笑える話",
+        "instruction": (
+            "思わずふふっと笑ってしまうような、軽いユーモアのある話や"
+            "「あるある」ネタを1つ書く。説教くさくせず、素直に面白がれる"
+            "内容にする。"
+        ),
+    },
+    {
+        "name": "挑戦の後押し",
+        "instruction": (
+            "何か新しいことに挑戦したくなるような、背中を押す言葉を書く。"
+            "大げさな決意ではなく、今日にでもできる具体的な小さな一歩を"
+            "イメージできる内容にする。"
+        ),
+    },
 ]
 
 
-def build_prompt(theme: SeasonTheme, max_length: int) -> str:
-    angle = random.choice(_ANGLES)
-    target = max(max_length - 15, 30)  # 「〜程度」の目安は上限より少し余裕を持たせる
+def build_prompt(theme: SeasonTheme, max_length: int, avoid: list[str] | None = None) -> str:
+    category = random.choice(_CATEGORIES)
+    target = max(max_length - 25, 30)  # 「〜程度」の目安は上限よりしっかり余裕を持たせる
+    # 季節への言及は「季節感」ジャンルの時だけ使う。他のジャンルにまで毎回
+    # 季節の話を混ぜると、ジャンルを分けた意味が薄れて画一的になるため。
+    season_line = f"今は{theme.label}の時期です。\n" if category["name"] == "季節感" else ""
+
+    avoid_block = ""
+    if avoid:
+        recent_list = "\n".join(f"- {t}" for t in avoid)
+        avoid_block = (
+            "\n直近の投稿で使った内容(下記と同じ名言・モチーフ・言い回し・出だしは"
+            f"絶対に繰り返さないこと):\n{recent_list}\n"
+        )
     return (
-        "あなたはInstagramで「時間の大切さ」を伝えるbotです。"
-        f"今は{theme.label}の時期です。"
-        "時間の使い方・一日の尊さ・一瞬の大切さについて、読んだ人がハッとするような"
-        "詩的な小話や気づきの一言を1つ書いてください。\n\n"
-        f"今回の切り口: {angle}\n\n"
+        f"【最重要・絶対条件】本文は日本語で{max_length}文字以内。これを1文字でも"
+        f"超えることは絶対に許されません。{target}文字程度を目安に、文章が"
+        "尻切れにならないよう、言いたいことをコンパクトにまとめて完結させてから"
+        "出力してください。書き終えたら自分で文字数を数え直し、"
+        f"{max_length}文字を超えていたら削って書き直してから答えてください。\n\n"
+        "あなたはInstagramで、読んだ人の一日が少し前向きになるような一言を"
+        "届けるbotです。\n"
+        f"{season_line}\n"
+        f"今回のジャンル: {category['name']}\n"
+        f"{category['instruction']}\n"
+        f"{avoid_block}\n"
         "厳守すること:\n"
-        "- 海・波・風・光・季節の移ろいといった、抽象的な自然の詩的表現だけに頼らない。"
-        "誰もが経験する日常生活の具体的なワンシーン（家事・通勤・待ち時間など）を必ず情景として描く。\n"
-        "- ただし、ブランド名・アプリ名・正確な秒数のような、やたら生々しい実用的情報を並べる"
-        "現実的すぎる文章にもしない。あくまで詩的な情景描写として自然に読めるようにする。\n"
-        "- 比喩は使うとしても1つまで。何重にも重ねない。\n"
+        "- 直近使った内容と重複しない、新しい切り口・話題にする。\n"
+        "- 季節感ジャンルでない限り、季節や気候の話には触れない。\n"
         "- 「二度と戻らない」「かけがえのない」「気づけば」「ふと」「そっと」「静かに」"
         "「寄せては返す」「儚い」「切なさ」など、いかにもAIが書く定型的な表現は使わない。\n"
-        "- 説教くさい断定や「〜しましょう」という呼びかけで終わらせない。\n"
-        "- 季節の言葉を入れる場合も一言程度に留め、話の中心にはしない。\n\n"
-        f"文字数は日本語で{target}文字程度、長くても{max_length}文字以内に必ず収めてください。"
-        "前置きや挨拶、鍵括弧などの装飾は一切つけず、本文だけを出力してください。"
+        "- 説教くさい断定や「〜しましょう」という押しつけがましい呼びかけで終わらせない。\n"
+        "- 比喩は使うとしても1つまで。何重にも重ねない。\n\n"
+        f"再確認: 本文は{max_length}文字以内(厳守)。前置きや挨拶、鍵括弧などの"
+        "装飾は一切つけず、本文だけを出力してください。"
     )
+
+
+def _strip_full_wrap(text: str) -> str:
+    """Geminiが本文全体を「」や引用符でまるごと囲んでしまった場合だけ、その外側の
+    1組を取り除く。文中(特に文頭)に本来含めたい「」がある場合は触らない。"""
+    text = text.strip()
+    for left, right in (("「", "」"), ('"', '"'), ("'", "'")):
+        if len(text) > 1 and text.startswith(left) and text.endswith(right):
+            return text[len(left):-len(right)].strip()
+    return text
 
 
 def _call_gemini(model: str, prompt: str, api_key: str, retry_delays: list[int]):
@@ -69,13 +134,13 @@ def _call_gemini(model: str, prompt: str, api_key: str, retry_delays: list[int])
     return None if last_res is None or not last_res.ok else last_res
 
 
-def generate_time_story(theme: SeasonTheme, max_length: int = DEFAULT_MAX_LENGTH,
-                         model: str = DEFAULT_MODEL) -> str:
+def generate_daily_story(theme: SeasonTheme, max_length: int = DEFAULT_MAX_LENGTH,
+                         model: str = DEFAULT_MODEL, avoid: list[str] | None = None) -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("環境変数 GEMINI_API_KEY が設定されていません")
 
-    prompt = build_prompt(theme, max_length)
+    prompt = build_prompt(theme, max_length, avoid=avoid)
 
     # Geminiの一時的な混雑(503)は数十秒待てば直ることが多いため、まず本命モデルで
     # リトライする。それでもダメなら、別モデル(lite版)へ1回だけフォールバックする。
@@ -87,7 +152,7 @@ def generate_time_story(theme: SeasonTheme, max_length: int = DEFAULT_MAX_LENGTH
 
     data = res.json()
     text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    text = text.strip("「」\"' \n")
+    text = _strip_full_wrap(text)
     if len(text) > max_length:
-        text = text[:max_length].rstrip() + "…"
+        text = text[:max_length - 1].rstrip() + "…"
     return text
