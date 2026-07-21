@@ -16,10 +16,14 @@ import requests
 GRAPH_HOST = "https://graph.instagram.com"
 
 
+def _api_root() -> str:
+    api_version = os.environ.get("IG_API_VERSION", "v21.0")
+    return f"{GRAPH_HOST}/{api_version}"
+
+
 def _base_url() -> str:
     ig_user_id = os.environ["IG_USER_ID"]
-    api_version = os.environ.get("IG_API_VERSION", "v21.0")
-    return f"{GRAPH_HOST}/{api_version}/{ig_user_id}"
+    return f"{_api_root()}/{ig_user_id}"
 
 
 def _create_container(base: str, access_token: str, image_url: str, **extra) -> str:
@@ -63,10 +67,13 @@ _REEL_POLL_INTERVAL_SEC = 10
 _REEL_POLL_TIMEOUT_SEC = 300
 
 
-def _wait_for_container_ready(base: str, access_token: str, creation_id: str) -> None:
+def _wait_for_container_ready(access_token: str, creation_id: str) -> None:
+    """コンテナのstatus_codeは、ユーザーIDの配下ではなくコンテナID自身のノードを
+    直接叩いて取得する({base}/{creation_id}のようにユーザーID配下にネストすると、
+    creation_idがフィールド/エッジ名として解釈され `nonexisting field` エラーになる)。"""
     elapsed = 0
     while elapsed <= _REEL_POLL_TIMEOUT_SEC:
-        res = requests.get(f"{base}/{creation_id}", params={
+        res = requests.get(f"{_api_root()}/{creation_id}", params={
             "fields": "status_code",
             "access_token": access_token,
         }, timeout=30)
@@ -94,7 +101,7 @@ def post_reel(video_url: str, caption: str | None = None) -> str:
     _raise_for_status(res)
     creation_id = res.json()["id"]
 
-    _wait_for_container_ready(base, access_token, creation_id)
+    _wait_for_container_ready(access_token, creation_id)
     return _publish_container(base, access_token, creation_id)
 
 
