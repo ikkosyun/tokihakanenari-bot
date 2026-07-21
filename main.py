@@ -61,10 +61,12 @@ def _generate(target_date: date, out_dir: Path) -> tuple[Path, str, str]:
     date_str = target_date.strftime("%Y-%m-%d")
     tmp_hourglass = out_dir / f".hourglass-{date_str}.png"
     final_image = out_dir / f"{date_str}.jpg"
+    story_image = out_dir / f"{date_str}_story.jpg"
 
     image_gen.generate_hourglass_image(theme, stats, tmp_hourglass)
     chart.compose_image(tmp_hourglass, stats, theme, final_image)
     tmp_hourglass.unlink(missing_ok=True)
+    chart.compose_story_image(final_image, story_image)
 
     return final_image, date_str, caption
 
@@ -95,11 +97,12 @@ def cmd_publish() -> None:
     date_str = (DOCS_IMAGES / "latest.txt").read_text(encoding="utf-8").strip()
     caption = (DOCS_IMAGES / f"{date_str}.caption.txt").read_text(encoding="utf-8")
     image_url = f"{base_url}/images/{date_str}.jpg"
+    story_image_url = f"{base_url}/images/{date_str}_story.jpg"
 
     media_id = instagram_post.post_image(image_url, caption)
     print(f"[publish] Instagramに投稿しました。media_id={media_id}")
 
-    story_id = instagram_post.post_story(image_url)
+    story_id = instagram_post.post_story(story_image_url)
     print(f"[publish] ストーリーにも投稿しました。story_id={story_id}")
 
     if slack_post.post_image_notification(image_url, caption):
