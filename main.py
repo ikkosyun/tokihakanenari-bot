@@ -88,12 +88,20 @@ def _generate(target_date: date, out_dir: Path) -> tuple[Path, str, str]:
     tmp_hourglass.unlink(missing_ok=True)
     chart.compose_story_image(final_image, story_image)
 
-    narration_text = narration.build_narration_text(stats)
-    chart.compose_reel_frame(final_image, narration_text, theme, reel_frame)
-    narration.generate_narration_audio(narration_text, narration_audio)
-    reel_video.compose_reel_video(reel_frame, narration_audio, reel_video_path)
-    reel_frame.unlink(missing_ok=True)
-    narration_audio.unlink(missing_ok=True)
+    # リールはフィード＋ストーリーという本体投稿より新しく、まだ枯れていない機能。
+    # ここで例外を漏らすと本体の画像/キャプション生成まで巻き込んで丸ごと失敗する
+    # (実際に2026-07-22、ffmpeg未検出でこの巻き込み事故が起きた)。
+    # 本体は既に生成済みのため、リール側の失敗はログのみで握りつぶして続行する。
+    try:
+        narration_text = narration.build_narration_text(stats)
+        chart.compose_reel_frame(final_image, narration_text, theme, reel_frame)
+        narration.generate_narration_audio(narration_text, narration_audio)
+        reel_video.compose_reel_video(reel_frame, narration_audio, reel_video_path)
+    except Exception as e:
+        print(f"[generate] リール生成に失敗しましたが、フィード/ストーリーは生成済みのため続行します: {e}")
+    finally:
+        reel_frame.unlink(missing_ok=True)
+        narration_audio.unlink(missing_ok=True)
 
     return final_image, date_str, caption
 
