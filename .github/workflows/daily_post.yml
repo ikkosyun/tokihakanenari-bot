@@ -2,8 +2,10 @@ name: Daily Post
 
 on:
   schedule:
-    # UTC 15:00 = JST 0:00 (毎日日本時間0時に実行)
-    - cron: "0 15 * * *"
+    # UTC 15:07 = JST 0:07。GitHub Actionsは「00分ちょうど」のcronに全世界からの
+    # 実行が集中して遅延しやすいという既知の傾向があるため、あえて数分ずらしている
+    # (このリポジトリでも 0 15 * * * のままだと3〜6時間遅延することが常態化していた)。
+    - cron: "7 15 * * *"
   workflow_dispatch: {}  # 手動テスト実行用（Actionsタブから「Run workflow」）
 
 permissions:
@@ -49,3 +51,10 @@ jobs:
           GH_PAGES_BASE_URL: ${{ vars.GH_PAGES_BASE_URL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: python main.py --publish
+
+      - name: Commit publish marker
+        if: always()
+        run: |
+          git add docs/images/*.published 2>/dev/null || true
+          git commit -m "Mark $(cat docs/images/latest.txt) as published" || echo "no changes to commit"
+          git push || echo "nothing to push"

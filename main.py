@@ -116,6 +116,14 @@ def cmd_dry_run(target_date: date) -> None:
 
 def cmd_generate(target_date: date) -> None:
     DOCS_IMAGES.mkdir(parents=True, exist_ok=True)
+
+    # 同じ日付で2回実行された場合(遅延した定期実行と手動実行が重なる等)、
+    # 既に投稿済みならGemini課金の再生成もしない。
+    date_str = target_date.strftime("%Y-%m-%d")
+    if (DOCS_IMAGES / f"{date_str}.published").exists():
+        print(f"[generate] {date_str}分は既に投稿済みのため生成をスキップします。")
+        return
+
     image_path, date_str, caption = _generate(target_date, DOCS_IMAGES)
 
     (DOCS_IMAGES / f"{date_str}.caption.txt").write_text(caption, encoding="utf-8")
@@ -135,11 +143,23 @@ def cmd_publish() -> None:
     story_image_url = f"{base_url}/images/{date_str}_story.jpg"
     reel_video_url = f"{base_url}/images/{date_str}_reel.mp4"
 
+    # 同じ日付に対してpublishが2回走る(遅延した定期実行と手動実行が重なる等)と
+    # 重複投稿になってしまうため、既に投稿済みならスキップする。
+    # (2026-07-24、実際にこれが原因で7/24分が2回投稿される事故が起きた)
+    published_marker = DOCS_IMAGES / f"{date_str}.published"
+    if published_marker.exists():
+        print(f"[publish] {date_str}分は既に投稿済みのためスキップします。")
+        return
+
     media_id = instagram_post.post_image(image_url, caption)
     print(f"[publish] Instagramに投稿しました。media_id={media_id}")
 
     story_id = instagram_post.post_story(story_image_url)
     print(f"[publish] ストーリーにも投稿しました。story_id={story_id}")
+
+    # フィード＋ストーリーという本体投稿が済んだ時点でマーカーを書く
+    # (この後リール/Slackで失敗しても、本体の再投稿は二度と起きないようにする)。
+    published_marker.write_text("", encoding="utf-8")
 
     # リールはまだ導入したばかりの機能のため、Slackと同様に失敗してもジョブ全体を
     # 失敗扱いにはしない（フィード＋ストーリーという本体投稿が成功していれば十分）。
