@@ -10,6 +10,7 @@ REST APIを requests で直接叩く実装にしている。
 """
 import base64
 import os
+import time
 from pathlib import Path
 
 import requests
@@ -71,6 +72,25 @@ def build_prompt(theme: SeasonTheme, stats: DayStats) -> str:
     )
 
 
+def _call_gemini_image(url: str, body: dict, api_key: str,
+                        retry_delays: list[int]) -> requests.Response:
+    """story.py/narration.pyと同じく、Geminiの一時的な混雑(503)は数十秒待てば
+    直ることが多いためリトライする。それ以外のエラー、またはリトライを使い切っても
+    ダメだった場合はそのままエラーにする(画像生成にはテキストのような安価な
+    フォールバックモデルが無いため、フォールバックはせずリトライのみ行う)。"""
+    last_res = None
+    for attempt, delay in enumerate([0, *retry_delays]):
+        if delay:
+            time.sleep(delay)
+        res = requests.post(url, params={"key": api_key}, json=body, timeout=120)
+        if res.ok:
+            return res
+        last_res = res
+        if res.status_code != 503:
+            break
+    return last_res
+
+
 def generate_hourglass_image(theme: SeasonTheme, stats: DayStats, save_path: Path,
                               model: str = DEFAULT_MODEL) -> Path:
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -83,7 +103,7 @@ def generate_hourglass_image(theme: SeasonTheme, stats: DayStats, save_path: Pat
         "generationConfig": {"imageConfig": {"aspectRatio": "1:1"}},
     }
 
-    res = requests.post(url, params={"key": api_key}, json=body, timeout=120)
+    res = _call_gemini_image(url, body, api_key, retry_delays=[15, 45, 90])
     if not res.ok:
         raise RuntimeError(f"Gemini API error ({res.status_code}): {res.text}")
 
