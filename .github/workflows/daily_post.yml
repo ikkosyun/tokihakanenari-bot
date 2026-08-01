@@ -42,7 +42,20 @@ jobs:
           git push
 
       - name: Wait for GitHub Pages to redeploy
-        run: sleep 60
+        env:
+          GH_PAGES_BASE_URL: ${{ vars.GH_PAGES_BASE_URL }}
+        run: |
+          url="${GH_PAGES_BASE_URL%/}/images/$(cat docs/images/latest.txt).jpg"
+          echo "polling: $url"
+          for i in $(seq 1 30); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$status" = "200" ]; then
+              echo "ready after ${i}0s (status $status)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::Pages did not return 200 within 5 minutes (last status $status), proceeding anyway"
 
       - name: Publish to Instagram and Slack
         env:
