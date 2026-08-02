@@ -136,7 +136,7 @@ def cmd_publish() -> None:
     import instagram_post
     import slack_post
 
-    base_url = os.environ["GH_PAGES_BASE_URL"].rstrip("/")
+    base_url = os.environ["GH_PAGES_BASE_URL"].strip().rstrip("/")
     date_str = (DOCS_IMAGES / "latest.txt").read_text(encoding="utf-8").strip()
     caption = (DOCS_IMAGES / f"{date_str}.caption.txt").read_text(encoding="utf-8")
     image_url = f"{base_url}/images/{date_str}.jpg"
